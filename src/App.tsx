@@ -14,6 +14,21 @@ import { PendulumEngine } from './physics/PendulumEngine';
 import { PhotoelectricEngine } from './physics/PhotoelectricEngine';
 import { SpringEngine } from './physics/SpringEngine';
 import { WaveInterferenceEngine } from './physics/WaveInterferenceEngine';
+import { LeverEngine } from './physics/LeverEngine';
+import { LeverCanvas } from './components/LeverCanvas';
+import { LeverControls } from './components/LeverControls';
+import { DensityEngine } from './physics/DensityEngine';
+import { DensityCanvas } from './components/DensityCanvas';
+import { DensityControls } from './components/DensityControls';
+import { ProjectileEngine } from './physics/ProjectileEngine';
+import { ProjectileCanvas } from './components/ProjectileCanvas';
+import { ProjectileControls } from './components/ProjectileControls';
+import { ArtilleryEngine3D } from './physics/ArtilleryEngine3D';
+import { ArtilleryCanvas3D } from './components/artillery3d/ArtilleryCanvas3D';
+import { ArtilleryControls3D } from './components/artillery3d/ArtilleryControls3D';
+import { CircularMotionEngine } from './physics/CircularMotionEngine';
+import { CircularMotionCanvas } from './components/CircularMotionCanvas';
+import { CircularMotionControls } from './components/CircularMotionControls';
 import { Atom } from 'lucide-react';
 
 function App() {
@@ -21,13 +36,26 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showVectors, setShowVectors] = useState(true);
   const [showDiagram, setShowDiagram] = useState(true);
+  const [showPath, setShowPath] = useState(true);
   
   const pendulumRef = useRef<PendulumEngine | null>(null);
   const photoRef = useRef<PhotoelectricEngine | null>(null);
   const springRef = useRef<SpringEngine | null>(null);
   const waveRef = useRef<WaveInterferenceEngine | null>(null);
+  const leverRef = useRef<LeverEngine | null>(null);
+  const densityRef = useRef<DensityEngine | null>(null);
+  const projectileRef = useRef<ProjectileEngine | null>(null);
+  const artilleryRef = useRef<ArtilleryEngine3D | null>(null);
+  const circularRef = useRef<CircularMotionEngine | null>(null);
 
   const activeTopicId = location.pathname.substring(1) || 'pendulum';
+
+  // Auto-recovery for HMR stale state
+  if (activeTopicId === 'circular-motion') {
+    if (circularRef.current && !circularRef.current.state.history) {
+      circularRef.current = new CircularMotionEngine();
+    }
+  }
 
   return (
     <div className="app-container">
@@ -86,6 +114,51 @@ function App() {
           <>
             <WaveInterferenceCanvas engineRef={waveRef} showDiagram={showDiagram} />
             <WaveInterferenceControls engineRef={waveRef} showDiagram={showDiagram} setShowDiagram={setShowDiagram} />
+          </>
+        } />
+
+        <Route path="/lever" element={
+          <>
+            <LeverCanvas engineRef={leverRef} showVectors={showVectors} />
+            <LeverControls engineRef={leverRef} showVectors={showVectors} setShowVectors={setShowVectors} />
+          </>
+        } />
+
+        <Route path="/density" element={
+          <>
+            <DensityCanvas engineRef={densityRef} />
+            <DensityControls engineRef={densityRef} />
+          </>
+        } />
+
+        <Route path="/projectile-motion" element={
+          <>
+            <ProjectileCanvas engineRef={projectileRef} showVectors={showVectors} showPath={showPath} />
+            <ProjectileControls engineRef={projectileRef} showVectors={showVectors} setShowVectors={setShowVectors} showPath={showPath} setShowPath={setShowPath} />
+          </>
+        } />
+
+        <Route path="/artillery-3d" element={
+          <>
+            <ArtilleryCanvas3D engineRef={artilleryRef} />
+            <ArtilleryControls3D engineRef={artilleryRef} />
+          </>
+        } />
+
+        <Route path="/circular-motion" element={
+          <>
+            <CircularMotionCanvas 
+              engineRef={circularRef} 
+              showVelocity={showVectors} 
+              showAcceleration={showVectors} 
+            />
+            <CircularMotionControls 
+              engineRef={circularRef} 
+              showVelocity={showVectors} 
+              setShowVelocity={setShowVectors}
+              showAcceleration={showVectors}
+              setShowAcceleration={setShowVectors}
+            />
           </>
         } />
 
