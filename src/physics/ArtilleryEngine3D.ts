@@ -13,7 +13,9 @@ export interface ArtilleryConfig3D {
   latitude: number;      // Latitude for Coriolis (degrees, positive = North)
   temperature: number;   // Surface Temperature (Celsius)
   dispersion: number;    // Dispersion variance multiplier (0 to 1)
+  seed: number;          // Map seed
 }
+
 
 export interface ProjectileState {
   id: string;
@@ -55,21 +57,44 @@ export interface VillageState {
   houses: { x: number; y: number; z: number; rotation: number; scaleX: number; scaleZ: number }[];
 }
 
+export interface PlayerState {
+  id: 1 | 2;
+  hp: number;
+  x: number;
+  z: number;
+  y: number;
+  weapon: 'standard' | 'he' | 'ap';
+}
+
 export interface ArtilleryState3D {
   projectiles: ProjectileState[];
   impacts: { x: number; y: number; z: number }[]; 
   targets: TargetState[];
   trees: TreeState[];
   villages: VillageState[];
+  players: PlayerState[];
+  activePlayerId: 1 | 2;
+  gameOver: boolean;
+  winner: 1 | 2 | null;
+}
+
+// Pseudo-random number generator for seeded terrain
+function seededRandom(seed: number) {
+    let t = seed += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
 }
 
 // Box-Muller transform for standard normal distribution
-function randomGaussian() {
+function randomGaussian(seedRng?: () => number) {
     let u = 0, v = 0;
-    while(u === 0) u = Math.random(); // Converting [0,1) to (0,1)
-    while(v === 0) v = Math.random();
+    const rng = seedRng || Math.random;
+    while(u === 0) u = rng(); 
+    while(v === 0) v = rng();
     return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
 }
+
 
 export class ArtilleryEngine3D {
   public config: ArtilleryConfig3D;
@@ -108,6 +133,7 @@ export class ArtilleryEngine3D {
       latitude: 21, // e.g. Hanoi
       temperature: 25,
       dispersion: 0.2,
+      seed: 12345,
       ...config
     };
     
@@ -116,20 +142,41 @@ export class ArtilleryEngine3D {
         impacts: [],
         targets: [],
         trees: [],
-        villages: []
+        villages: [],
+        players: [
+            { id: 1, hp: 100, x: -2000, z: 0, y: 0, weapon: 'standard' },
+            { id: 2, hp: 100, x: 2000, z: 0, y: 0, weapon: 'standard' }
+        ],
+        activePlayerId: 1,
+        gameOver: false,
+        winner: null
     };
+    this.initGame();
+  }
+
+  private initGame() {
+    // Set heights for players
+    this.state.players[0].y = this.getTerrainHeight(this.state.players[0].x, this.state.players[0].z);
+    this.state.players[1].y = this.getTerrainHeight(this.state.players[1].x, this.state.players[1].z);
+    
     this.generateScenery();
-    this.spawnTargets(5); // Spawn initial targets
+  }
+
+  private rng() {
+    return seededRandom(this.config.seed++);
   }
 
   private generateScenery() {
     this.state.trees = [];
     this.state.villages = [];
+    let tempSeed = this.config.seed;
+    const rng = () => seededRandom(tempSeed++);
+
     
     // Generate trees
     for (let i = 0; i < 3000; i++) {
-        const x = (Math.random() - 0.5) * 6000;
-        const z = (Math.random() - 0.5) * 6000;
+        const x = (rng() - 0.5) * 6000;
+        const z = (rng() - 0.5) * 6000;
         
         // Avoid river
         const riverCenterX = Math.sin(z / 300) * 300 + Math.cos(z / 800) * 400;
@@ -150,7 +197,7 @@ export class ArtilleryEngine3D {
         if (noise > 0.5) {
             this.state.trees.push({
                 x, y, z,
-                scale: 0.8 + Math.random() * 0.6
+                scale: 0.8 + rng() * 0.6
             });
         }
     }
@@ -160,8 +207,8 @@ export class ArtilleryEngine3D {
         let cx = 0, cz = 0, cy = 0;
         let found = false;
         for(let attempts=0; attempts<50; attempts++) {
-            cx = (Math.random() - 0.5) * 4000;
-            cz = -1000 - Math.random() * 3000; 
+            cx = (rng() - 0.5) * 4000;
+            cz = -1000 - rng() * 3000; 
             const riverCenterX = Math.sin(cz / 300) * 300 + Math.cos(cz / 800) * 400;
             if (Math.abs(cx - riverCenterX) < 150) continue; 
             
@@ -171,8 +218,8 @@ export class ArtilleryEngine3D {
             // Check flatness
             let flat = true;
             for(let i=0; i<5; i++) {
-                const tx = cx + (Math.random()-0.5)*100;
-                const tz = cz + (Math.random()-0.5)*100;
+                const tx = cx + (rng()-0.5)*100;
+                const tz = cz + (rng()-0.5)*100;
                 if (Math.abs(this.getTerrainHeight(tx, tz) - cy) > 5) {
                     flat = false; break;
                 }
@@ -187,38 +234,21 @@ export class ArtilleryEngine3D {
                 houses: []
             };
             
-            const houseCount = 10 + Math.floor(Math.random() * 10);
+            const houseCount = 10 + Math.floor(rng() * 10);
             for(let h=0; h<houseCount; h++) {
-                const hx = cx + (Math.random()-0.5)*80;
-                const hz = cz + (Math.random()-0.5)*80;
+                const hx = cx + (rng()-0.5)*80;
+                const hz = cz + (rng()-0.5)*80;
                 const hy = this.getTerrainHeight(hx, hz);
                 village.houses.push({
                     x: hx, y: hy, z: hz,
-                    rotation: Math.random() * Math.PI,
-                    scaleX: 4 + Math.random() * 4,
-                    scaleZ: 4 + Math.random() * 4
+                    rotation: rng() * Math.PI,
+                    scaleX: 4 + rng() * 4,
+                    scaleZ: 4 + rng() * 4
                 });
             }
             this.state.villages.push(village);
         }
     }
-  }
-
-  public spawnTargets(count: number = 5) {
-    this.state.targets = [];
-    for (let i = 0; i < count; i++) {
-        // Generate targets mostly forward (negative Z), some variance in X
-        const x = this.config.mortarX + (Math.random() - 0.5) * 4000;
-        const z = this.config.mortarZ - 500 - Math.random() * 3000; 
-        const y = this.getTerrainHeight(x, z);
-        this.state.targets.push({
-            id: Math.random().toString(36).substr(2, 9),
-            x, y, z,
-            radius: 20, // 20m hit radius
-            isDestroyed: false
-        });
-    }
-    this.notifyListeners();
   }
 
   public setConfig(newConfig: Partial<ArtilleryConfig3D>) {
@@ -227,10 +257,16 @@ export class ArtilleryEngine3D {
   }
 
   public play() {
+    if (this.state.gameOver) return;
+
+    const activePlayer = this.state.players.find(p => p.id === this.state.activePlayerId)!;
+    this.config.mortarX = activePlayer.x;
+    this.config.mortarZ = activePlayer.z;
+
     const variance = this.config.dispersion;
-    const actualV0 = this.config.v0 + randomGaussian() * (variance * 2);
-    const actualEl = this.config.elevation + randomGaussian() * (variance * 0.5);
-    const actualAz = this.config.azimuth + randomGaussian() * (variance * 0.5);
+    const actualV0 = this.config.v0 + randomGaussian(() => this.rng()) * (variance * 2);
+    const actualEl = this.config.elevation + randomGaussian(() => this.rng()) * (variance * 0.5);
+    const actualAz = this.config.azimuth + randomGaussian(() => this.rng()) * (variance * 0.5);
 
     const elRad = (actualEl * Math.PI) / 180;
     const azRad = (actualAz * Math.PI) / 180;
@@ -275,6 +311,14 @@ export class ArtilleryEngine3D {
   public reset() {
     this.pause();
     this.state.projectiles = [];
+    this.state.impacts = [];
+    this.state.players[0].hp = 100;
+    this.state.players[1].hp = 100;
+    this.state.gameOver = false;
+    this.state.winner = null;
+    this.state.activePlayerId = 1;
+    this.config.seed = Math.floor(Math.random() * 100000);
+    this.initGame();
     this.notifyListeners();
   }
 
@@ -337,8 +381,23 @@ export class ArtilleryEngine3D {
         this.animationFrameId = requestAnimationFrame(this.loop);
     } else {
         this.isRunning = false;
+        if (!this.state.gameOver) {
+           this.endTurn();
+        }
     }
   };
+
+  private endTurn() {
+     // Switch turn
+     this.state.activePlayerId = this.state.activePlayerId === 1 ? 2 : 1;
+     
+     // Randomize weather slightly for the next turn
+     this.config.windSpeed = Math.max(0, Math.min(20, this.config.windSpeed + (Math.random() - 0.5) * 10));
+     this.config.windDir = (this.config.windDir + (Math.random() - 0.5) * 90) % 360;
+     
+     this.notifyListeners();
+  }
+
 
   private stepAll(dt: number) {
     this.state.projectiles.forEach(p => {
@@ -400,14 +459,21 @@ export class ArtilleryEngine3D {
       p.isLanded = true;
       this.state.impacts.push({ x: p.x, y: p.y, z: p.z });
       
-      // Hit detection
-      this.state.targets.forEach(target => {
-          if (!target.isDestroyed) {
-              const dx = p.x - target.x;
-              const dz = p.z - target.z;
-              const dist = Math.sqrt(dx*dx + dz*dz);
-              if (dist <= target.radius + 10) { // +10m blast radius
-                  target.isDestroyed = true;
+      // Hit detection on players
+      const blastRadius = 30; // 30m explosion radius
+      this.state.players.forEach(player => {
+          const dx = p.x - player.x;
+          const dz = p.z - player.z;
+          const dist = Math.sqrt(dx*dx + dz*dz);
+          
+          if (dist <= blastRadius) {
+              // Calculate damage: max 50, decreases with distance
+              const damage = Math.floor(50 * (1 - dist / blastRadius));
+              player.hp = Math.max(0, player.hp - damage);
+              
+              if (player.hp === 0 && !this.state.gameOver) {
+                 this.state.gameOver = true;
+                 this.state.winner = player.id === 1 ? 2 : 1;
               }
           }
       });

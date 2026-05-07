@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { OhmsLawCanvas } from './components/OhmsLawCanvas';
+import { OhmsLawControls } from './components/OhmsLawControls';
 import { SimulationCanvas } from './components/SimulationCanvas';
 import { ControlPanel } from './components/ControlPanel';
 import { PhotoelectricCanvas } from './components/PhotoelectricCanvas';
@@ -17,6 +19,7 @@ import { WaveInterferenceEngine } from './physics/WaveInterferenceEngine';
 import { LeverEngine } from './physics/LeverEngine';
 import { LeverCanvas } from './components/LeverCanvas';
 import { LeverControls } from './components/LeverControls';
+import { OhmsLawEngine } from './physics/OhmsLawEngine';
 import { DensityEngine } from './physics/DensityEngine';
 import { DensityCanvas } from './components/DensityCanvas';
 import { DensityControls } from './components/DensityControls';
@@ -26,6 +29,7 @@ import { ProjectileControls } from './components/ProjectileControls';
 import { ArtilleryEngine3D } from './physics/ArtilleryEngine3D';
 import { ArtilleryCanvas3D } from './components/artillery3d/ArtilleryCanvas3D';
 import { ArtilleryControls3D } from './components/artillery3d/ArtilleryControls3D';
+import { ArtilleryMultiplayer } from './components/artillery3d/ArtilleryMultiplayer';
 import { CircularMotionEngine } from './physics/CircularMotionEngine';
 import { CircularMotionCanvas } from './components/CircularMotionCanvas';
 import { CircularMotionControls } from './components/CircularMotionControls';
@@ -50,6 +54,9 @@ import { SoundPitchControls } from './components/SoundPitchControls';
 import { MagnetismEngine } from './physics/MagnetismEngine';
 import { MagnetismCanvas } from './components/MagnetismCanvas';
 import { MagnetismControls } from './components/MagnetismControls';
+import { RefractionEngine } from './physics/RefractionEngine';
+import { RefractionCanvas } from './components/RefractionCanvas';
+import { RefractionControls } from './components/RefractionControls';
 import { Atom } from 'lucide-react';
 
 function App() {
@@ -75,6 +82,8 @@ function App() {
   const lightReflectionRef = useRef<LightReflectionEngine | null>(null);
   const soundPitchRef = useRef<SoundPitchEngine | null>(null);
   const magnetismRef = useRef<MagnetismEngine | null>(null);
+  const ohmRef = useRef<OhmsLawEngine | null>(null);
+  const refractionRef = useRef<RefractionEngine | null>(null);
 
   const activeTopicId = location.pathname.substring(1) || 'pendulum';
 
@@ -167,10 +176,7 @@ function App() {
         } />
 
         <Route path="/artillery-3d" element={
-          <>
-            <ArtilleryCanvas3D engineRef={artilleryRef} />
-            <ArtilleryControls3D engineRef={artilleryRef} />
-          </>
+          <ArtilleryMultiplayer engineRef={artilleryRef} />
         } />
 
         <Route path="/circular-motion" element={
@@ -262,6 +268,20 @@ function App() {
           <>
             <MagnetismCanvas engineRef={magnetismRef} />
             <MagnetismControls engineRef={magnetismRef} />
+          </>
+        } />
+
+        <Route path="/ohm-law" element={
+          <>
+            <OhmsLawCanvas engineRef={ohmRef} />
+            <OhmsLawControls engineRef={ohmRef} />
+          </>
+        } />
+
+        <Route path="/refraction" element={
+          <>
+            <RefractionCanvas engineRef={refractionRef} />
+            <RefractionControls engineRef={refractionRef} />
           </>
         } />
 

@@ -43,32 +43,50 @@ function Terrain({ engineRef }: { engineRef: React.MutableRefObject<ArtilleryEng
 }
 
 // --- MORTAR COMPONENT ---
-function Mortar({ config, engineRef }: { config: ArtilleryConfig3D, engineRef: React.MutableRefObject<ArtilleryEngine3D | null> }) {
-  const azRad = (config.azimuth * Math.PI) / 180;
-  const elRad = (config.elevation * Math.PI) / 180;
-  
-  // Calculate ground height at mortar position
-  const mortarY = engineRef.current ? engineRef.current.getTerrainHeight(config.mortarX, config.mortarZ) : 0;
+function Mortar({ player, isHost, isActive, isLocalPlayer, config }: { player: any, isHost: boolean, isActive: boolean, isLocalPlayer: boolean, config: any }) {
+  // If it's the local player, we can show their live aiming config!
+  const azRad = isLocalPlayer ? (config.azimuth * Math.PI) / 180 : (isHost ? 90 * Math.PI / 180 : 270 * Math.PI / 180); 
+  const elRad = isLocalPlayer ? (config.elevation * Math.PI) / 180 : (45 * Math.PI / 180);
 
   return (
-    <group position={[config.mortarX, mortarY + 0.5, config.mortarZ]} rotation={[0, -azRad, 0]}>
-      {/* Base plate */}
-      <Box args={[2, 0.2, 2]} position={[0, -0.4, 0]} castShadow>
-        <meshStandardMaterial color="#334155" />
-      </Box>
-      
-      {/* Rotating mount (Azimuth handled by parent group) */}
-      <Cylinder args={[0.5, 0.5, 1]} position={[0, 0, 0]} castShadow>
-           <meshStandardMaterial color="#475569" />
-      </Cylinder>
-      
-      {/* Barrel (Elevation) */}
-      {/* Note: Cylinder is Y-aligned. Rotate -90 on X to point North (Z-) at el=0. */}
-      <group rotation={[elRad - Math.PI / 2, 0, 0]}>
-         <Cylinder args={[0.3, 0.3, 4]} position={[0, 2, 0]} castShadow>
-            <meshStandardMaterial color="#1e293b" />
-         </Cylinder>
+    <group position={[player.x, player.y + 0.5, player.z]}>
+      {/* Name Label */}
+      <Text position={[0, 10, 0]} fontSize={3} color={isLocalPlayer ? "#34d399" : "#ef4444"} renderOrder={999} depthTest={false}>
+          {isLocalPlayer ? "PHÁO CỦA BẠN" : "ĐỐI THỦ"}
+      </Text>
+
+      {/* Mortar Body rotates based on Azimuth */}
+      <group rotation={[0, -azRad, 0]}>
+        {/* Base plate */}
+        <Box args={[3, 0.4, 3]} position={[0, -0.2, 0]} castShadow>
+          <meshStandardMaterial color={isHost ? "#3b82f6" : "#ef4444"} />
+        </Box>
+        
+        {/* Rotating mount */}
+        <Cylinder args={[0.8, 0.8, 1.5]} position={[0, 0.5, 0]} castShadow>
+             <meshStandardMaterial color="#475569" />
+        </Cylinder>
+        
+        {/* Barrel (Rotates based on Elevation) */}
+        <group rotation={[elRad - Math.PI / 2, 0, 0]} position={[0, 1, 0]}>
+           <Cylinder args={[0.4, 0.4, 5]} position={[0, 2.5, 0]} castShadow>
+              <meshStandardMaterial color="#1e293b" />
+           </Cylinder>
+        </group>
       </group>
+      
+      {/* HP Bar */}
+      <Text position={[0, 7.5, 0]} fontSize={2} color={player.hp > 30 ? "#10b981" : "#ef4444"} renderOrder={999} depthTest={false}>
+          {player.hp} HP
+      </Text>
+      
+      {/* Active Indicator */}
+      {isActive && (
+          <mesh position={[0, 12, 0]}>
+              <coneGeometry args={[1.5, 3, 4]} />
+              <meshStandardMaterial color="#facc15" emissive="#facc15" emissiveIntensity={0.5} />
+          </mesh>
+      )}
     </group>
   );
 }
@@ -248,7 +266,9 @@ function Scenery({ engineRef }: { engineRef: React.MutableRefObject<ArtilleryEng
 }
 
 // --- MINIMAP 2D COMPONENT ---
-function Minimap2D({ engineRef }: { engineRef: React.MutableRefObject<ArtilleryEngine3D | null> }) {
+import { NetworkManager } from '../../physics/NetworkManager';
+
+function Minimap2D({ engineRef, network }: { engineRef: React.MutableRefObject<ArtilleryEngine3D | null>, network: NetworkManager }) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [selectedPoint, setSelectedPoint] = React.useState<{x: number, y: number, z: number, dist: number, az: number} | null>(null);
     const selectedPointRef = useRef<{x: number, z: number} | null>(null);
@@ -264,14 +284,18 @@ function Minimap2D({ engineRef }: { engineRef: React.MutableRefObject<ArtilleryE
         
         const W = canvasRef.current.width;
         const H = canvasRef.current.height;
-        const scale = 200 / 6000;
+        const scale = 200 / 10000;
         
-        const worldX = config.mortarX + (mouseX - W/2) / scale;
-        const worldZ = config.mortarZ + (mouseY - H/2) / scale;
+        const localPlayer = engine.state.players?.find(p => p.id === (network.isHost ? 1 : 2));
+        const mortarX = localPlayer ? localPlayer.x : config.mortarX;
+        const mortarZ = localPlayer ? localPlayer.z : config.mortarZ;
+        
+        const worldX = mortarX + (mouseX - W/2) / scale;
+        const worldZ = mortarZ + (mouseY - H/2) / scale;
         const worldY = engine.getTerrainHeight(worldX, worldZ);
         
-        const dx = worldX - config.mortarX;
-        const dz = worldZ - config.mortarZ;
+        const dx = worldX - mortarX;
+        const dz = worldZ - mortarZ;
         const dist = Math.sqrt(dx*dx + dz*dz);
         let az = Math.atan2(dx, -dz) * 180 / Math.PI;
         if (az < 0) az += 360;
@@ -303,17 +327,21 @@ function Minimap2D({ engineRef }: { engineRef: React.MutableRefObject<ArtilleryE
             ctx.fillStyle = 'rgba(0, 20, 0, 0.8)';
             ctx.fillRect(0, 0, W, H);
             
-            // Map Scale: 200px = 6000m -> 1px = 30m
-            const scale = 200 / 6000;
-            const mapX = (worldX: number) => W/2 + (worldX - config.mortarX) * scale;
-            const mapZ = (worldZ: number) => H/2 + (worldZ - config.mortarZ) * scale;
+            const localPlayer = state.players?.find((p: any) => p.id === (network.isHost ? 1 : 2));
+            const mortarX = localPlayer ? localPlayer.x : config.mortarX;
+            const mortarZ = localPlayer ? localPlayer.z : config.mortarZ;
+
+            // Map Scale: 200px = 10000m
+            const scale = 200 / 10000;
+            const mapX = (worldX: number) => W/2 + (worldX - mortarX) * scale;
+            const mapZ = (worldZ: number) => H/2 + (worldZ - mortarZ) * scale;
             
             // River (thick blue line)
             ctx.strokeStyle = 'rgba(14, 165, 233, 0.3)';
             ctx.lineWidth = 10;
             ctx.beginPath();
             for(let i = -3000; i <= 3000; i+=200) {
-                const rz = config.mortarZ + i;
+                const rz = mortarZ + i;
                 const rx = Math.sin(rz / 300) * 300 + Math.cos(rz / 800) * 400;
                 if (i === -3000) ctx.moveTo(mapX(rx), mapZ(rz));
                 else ctx.lineTo(mapX(rx), mapZ(rz));
@@ -325,10 +353,10 @@ function Minimap2D({ engineRef }: { engineRef: React.MutableRefObject<ArtilleryE
             ctx.lineWidth = 1;
             ctx.beginPath();
             for(let i = -3000; i <= 3000; i+=1000) {
-                ctx.moveTo(mapX(config.mortarX + i), 0);
-                ctx.lineTo(mapX(config.mortarX + i), H);
-                ctx.moveTo(0, mapZ(config.mortarZ + i));
-                ctx.lineTo(W, mapZ(config.mortarZ + i));
+                ctx.moveTo(mapX(mortarX + i), 0);
+                ctx.lineTo(mapX(mortarX + i), H);
+                ctx.moveTo(0, mapZ(mortarZ + i));
+                ctx.lineTo(W, mapZ(mortarZ + i));
             }
             ctx.stroke();
             
@@ -382,23 +410,27 @@ function Minimap2D({ engineRef }: { engineRef: React.MutableRefObject<ArtilleryE
                 }
             });
             
-            // Mortar (Blue)
-            ctx.fillStyle = '#3b82f6';
-            ctx.beginPath();
-            ctx.arc(mapX(config.mortarX), mapZ(config.mortarZ), 5, 0, Math.PI*2);
-            ctx.fill();
+            // Mortars (Players)
+            state.players?.forEach((p: any) => {
+                ctx.fillStyle = p.id === (network.isHost ? 1 : 2) ? '#3b82f6' : '#ef4444';
+                ctx.beginPath();
+                ctx.arc(mapX(p.x), mapZ(p.z), 5, 0, Math.PI*2);
+                ctx.fill();
+            });
             
-            // Direction line
-            const dirLen = 25;
-            const azRad = (config.azimuth * Math.PI) / 180;
-            const dx = Math.sin(azRad) * dirLen;
-            const dz = -Math.cos(azRad) * dirLen;
-            ctx.strokeStyle = 'rgba(59, 130, 246, 0.8)';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(mapX(config.mortarX), mapZ(config.mortarZ));
-            ctx.lineTo(mapX(config.mortarX) + dx, mapZ(config.mortarZ) + dz);
-            ctx.stroke();
+            // Direction line (Only draw for local player)
+            if (state.activePlayerId === (network.isHost ? 1 : 2)) {
+                const dirLen = 25;
+                const azRad = (config.azimuth * Math.PI) / 180;
+                const dx = Math.sin(azRad) * dirLen;
+                const dz = -Math.cos(azRad) * dirLen;
+                ctx.strokeStyle = 'rgba(59, 130, 246, 0.8)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(mapX(mortarX), mapZ(mortarZ));
+                ctx.lineTo(mapX(mortarX) + dx, mapZ(mortarZ) + dz);
+                ctx.stroke();
+            }
             
             // Compass N
             ctx.fillStyle = '#fff';
@@ -493,10 +525,12 @@ function Minimap2D({ engineRef }: { engineRef: React.MutableRefObject<ArtilleryE
 // --- MAIN CANVAS COMPONENT ---
 interface ArtilleryCanvasProps {
   engineRef: React.MutableRefObject<ArtilleryEngine3D | null>;
+  network: NetworkManager;
 }
 
-export function ArtilleryCanvas3D({ engineRef }: ArtilleryCanvasProps) {
+export function ArtilleryCanvas3D({ engineRef, network }: ArtilleryCanvasProps) {
   const [, setTick] = React.useState(0);
+  const [cameraLocked, setCameraLocked] = React.useState(true);
   
   useEffect(() => {
     if (engineRef.current) {
@@ -516,7 +550,13 @@ export function ArtilleryCanvas3D({ engineRef }: ArtilleryCanvasProps) {
 
   const state = engineRef.current.state;
   const config = engineRef.current.config;
-  const mortarY = engineRef.current.getTerrainHeight(config.mortarX, config.mortarZ);
+  
+  // Camera focuses on the LOCAL player instead of active player
+  const myPlayerId = network.isHost ? 1 : 2;
+  const localPlayer = state.players?.find(p => p.id === myPlayerId);
+  const focusX = localPlayer ? localPlayer.x : 0;
+  const focusZ = localPlayer ? localPlayer.z : 0;
+  const focusY = engineRef.current.getTerrainHeight(focusX, focusZ);
 
   return (
     <div style={{ width: '100%', height: '100%', background: '#000', position: 'relative' }}>
@@ -536,10 +576,17 @@ export function ArtilleryCanvas3D({ engineRef }: ArtilleryCanvasProps) {
             shadow-camera-bottom={-1000}
         />
         
-        <OrbitControls makeDefault target={[config.mortarX, mortarY, config.mortarZ]} maxPolarAngle={Math.PI / 2 - 0.05} />
+        <OrbitControls 
+          makeDefault 
+          target={[focusX, focusY, focusZ]} 
+          maxPolarAngle={Math.PI / 2 - 0.05} 
+          enablePan={!cameraLocked} 
+          minDistance={10}
+          maxDistance={1500}
+        />
         
-        {/* Compass Rose (Moves with Mortar) */}
-        <group position={[config.mortarX, mortarY + 0.2, config.mortarZ]}>
+        {/* Compass Rose (Local Player's Position) */}
+        <group position={[focusX, focusY + 0.2, focusZ]}>
             {/* Compass Axes */}
             <axesHelper args={[50]} />
             
@@ -552,14 +599,46 @@ export function ArtilleryCanvas3D({ engineRef }: ArtilleryCanvasProps) {
 
         <Terrain engineRef={engineRef} />
         <Scenery engineRef={engineRef} />
-        <Mortar config={config} engineRef={engineRef} />
+        {state.players?.map((p: any) => (
+            <Mortar 
+              key={p.id} 
+              player={p} 
+              isHost={p.id === 1} 
+              isActive={p.id === state.activePlayerId} 
+              isLocalPlayer={p.id === myPlayerId}
+              config={config}
+            />
+        ))}
         <Targets targets={state.targets || []} />
         {state.projectiles.map(p => (
             <Projectile key={p.id} projectile={p} />
         ))}
         <ImpactMarkers impacts={state.impacts} />
       </Canvas>
-      <Minimap2D engineRef={engineRef} />
+      <Minimap2D engineRef={engineRef} network={network} />
+      
+      {/* Camera Controls Overlay */}
+      <div style={{ position: 'absolute', top: '20px', left: '20px', zIndex: 10 }}>
+        <button 
+          onClick={() => setCameraLocked(!cameraLocked)}
+          style={{
+            background: cameraLocked ? 'rgba(16, 185, 129, 0.8)' : 'rgba(71, 85, 105, 0.8)',
+            color: '#fff',
+            border: '1px solid rgba(255,255,255,0.2)',
+            padding: '8px 16px',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxShadow: '0 4px 6px rgba(0,0,0,0.3)',
+            backdropFilter: 'blur(4px)'
+          }}
+        >
+          {cameraLocked ? '🔒 Đã khóa Camera (Chỉ xoay)' : '🔓 Camera tự do (Cho phép kéo)'}
+        </button>
+      </div>
     </div>
   );
 }
