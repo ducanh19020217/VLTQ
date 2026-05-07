@@ -29,6 +29,27 @@ import { ArtilleryControls3D } from './components/artillery3d/ArtilleryControls3
 import { CircularMotionEngine } from './physics/CircularMotionEngine';
 import { CircularMotionCanvas } from './components/CircularMotionCanvas';
 import { CircularMotionControls } from './components/CircularMotionControls';
+import { ElectricFieldEngine } from './physics/ElectricFieldEngine';
+import { ElectricFieldCanvas } from './components/ElectricFieldCanvas';
+import { ElectricFieldControls } from './components/ElectricFieldControls';
+import { LorentzEngine } from './physics/LorentzEngine';
+import { LorentzCanvas3D } from './components/LorentzCanvas3D';
+import { LorentzControls } from './components/LorentzControls';
+import { MomentumEngine } from './physics/MomentumEngine';
+import { MomentumCanvas } from './components/MomentumCanvas';
+import { MomentumControls } from './components/MomentumControls';
+import { ThermalExpansionEngine } from './physics/ThermalExpansionEngine';
+import { ThermalExpansionCanvas } from './components/ThermalExpansionCanvas';
+import { ThermalExpansionControls } from './components/ThermalExpansionControls';
+import { LightReflectionEngine } from './physics/LightReflectionEngine';
+import { LightReflectionCanvas } from './components/LightReflectionCanvas';
+import { LightReflectionControls } from './components/LightReflectionControls';
+import { SoundPitchEngine } from './physics/SoundPitchEngine';
+import { SoundPitchCanvas } from './components/SoundPitchCanvas';
+import { SoundPitchControls } from './components/SoundPitchControls';
+import { MagnetismEngine } from './physics/MagnetismEngine';
+import { MagnetismCanvas } from './components/MagnetismCanvas';
+import { MagnetismControls } from './components/MagnetismControls';
 import { Atom } from 'lucide-react';
 
 function App() {
@@ -47,6 +68,13 @@ function App() {
   const projectileRef = useRef<ProjectileEngine | null>(null);
   const artilleryRef = useRef<ArtilleryEngine3D | null>(null);
   const circularRef = useRef<CircularMotionEngine | null>(null);
+  const electricFieldRef = useRef<ElectricFieldEngine | null>(null);
+  const lorentzRef = useRef<LorentzEngine | null>(null);
+  const momentumRef = useRef<MomentumEngine | null>(null);
+  const thermalExpansionRef = useRef<ThermalExpansionEngine | null>(null);
+  const lightReflectionRef = useRef<LightReflectionEngine | null>(null);
+  const soundPitchRef = useRef<SoundPitchEngine | null>(null);
+  const magnetismRef = useRef<MagnetismEngine | null>(null);
 
   const activeTopicId = location.pathname.substring(1) || 'pendulum';
 
@@ -159,6 +187,81 @@ function App() {
               showAcceleration={showVectors}
               setShowAcceleration={setShowVectors}
             />
+          </>
+        } />
+
+        <Route path="/electric-field" element={
+          <>
+            <ElectricFieldCanvas 
+              engineRef={electricFieldRef} 
+              showFieldLines={showDiagram} 
+              showPotential={showPath}
+              showVectors={showVectors}
+            />
+            <ElectricFieldControls 
+              engineRef={electricFieldRef}
+              showFieldLines={showDiagram}
+              setShowFieldLines={setShowDiagram}
+              showPotential={showPath}
+              setShowPotential={setShowPath}
+              showVectors={showVectors}
+              setShowVectors={setShowVectors}
+            />
+          </>
+        } />
+
+        <Route path="/magnetic-force" element={
+          <>
+            <LorentzCanvas3D 
+              engineRef={lorentzRef} 
+              showForce={showVectors} 
+              showVelocity={showDiagram}
+              showBField={showPath}
+            />
+            <LorentzControls 
+              engineRef={lorentzRef}
+              showForce={showVectors}
+              setShowForce={setShowVectors}
+              showVelocity={showDiagram}
+              setShowVelocity={setShowDiagram}
+              showBField={showPath}
+              setShowBField={setShowPath}
+            />
+          </>
+        } />
+
+        <Route path="/momentum" element={
+          <>
+            <MomentumCanvas engineRef={momentumRef} />
+            <MomentumControls engineRef={momentumRef} />
+          </>
+        } />
+
+        <Route path="/thermal-expansion" element={
+          <>
+            <ThermalExpansionCanvas engineRef={thermalExpansionRef} />
+            <ThermalExpansionControls engineRef={thermalExpansionRef} />
+          </>
+        } />
+
+        <Route path="/reflection" element={
+          <>
+            <LightReflectionCanvas engineRef={lightReflectionRef} />
+            <LightReflectionControls engineRef={lightReflectionRef} />
+          </>
+        } />
+
+        <Route path="/sound-pitch" element={
+          <>
+            <SoundPitchCanvas engineRef={soundPitchRef} />
+            <SoundPitchControls engineRef={soundPitchRef} />
+          </>
+        } />
+
+        <Route path="/magnet" element={
+          <>
+            <MagnetismCanvas engineRef={magnetismRef} />
+            <MagnetismControls engineRef={magnetismRef} />
           </>
         } />
 
