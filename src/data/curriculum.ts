@@ -47,6 +47,7 @@ export const curriculum: GradeContent[] = [
     grade: 10,
     topics: [
       { id: 'projectile-motion', title: 'Chuyển động ném ngang', type: '2d' },
+      { id: 'artillery-3d', title: 'Pháo binh 3D (Đạn đạo)', type: '3d' },
       { id: 'circular-motion', title: 'Chuyển động tròn đều', type: '2d' },
       { id: 'momentum', title: 'Định luật bảo toàn động lượng', type: '2d' }
     ]
